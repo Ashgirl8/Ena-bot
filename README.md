@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> final enas bot
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -6,113 +6,123 @@
   <title>Chat with Ena</title>
   <style>
     body {
-      background: #0f0f0f;
-      color: #f2f2f2;
-      font-family: "Segoe UI", sans-serif;
+      font-family: 'Segoe UI', sans-serif;
+      background: #1e1e2f;
+      color: #fff;
+      margin: 0;
+      padding: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 2rem;
     }
-    h1 {
-      color: #ffc0cb;
-      font-size: 2rem;
-    }
-    #chat {
-      width: 100%;
-      max-width: 600px;
-      height: 400px;
-      overflow-y: auto;
-      background: #1e1e1e;
-      border-radius: 10px;
+
+    header {
+      background-color: #29293d;
       padding: 1rem;
-      margin-bottom: 1rem;
-      box-shadow: 0 0 15px rgba(255, 192, 203, 0.2);
+      width: 100%;
+      text-align: center;
+      font-size: 1.8rem;
+      font-weight: bold;
+      border-bottom: 2px solid #3e3e5e;
     }
+
+    #chat {
+      width: 90%;
+      max-width: 800px;
+      height: 500px;
+      background: #2b2b40;
+      border-radius: 10px;
+      overflow-y: auto;
+      padding: 1rem;
+      margin-top: 1rem;
+    }
+
     .message {
       margin-bottom: 1rem;
     }
-    .user { color: #66ccff; }
-    .bot { color: #ffd1dc; }
+
+    .user { color: #90caf9; }
+    .bot { color: #a5d6a7; }
+
+    #input-box {
+      display: flex;
+      width: 90%;
+      max-width: 800px;
+      margin: 1rem auto;
+    }
+
     input[type="text"] {
-      width: 100%;
-      max-width: 600px;
-      padding: 0.7rem;
+      flex: 1;
+      padding: 1rem;
       font-size: 1rem;
       border: none;
-      border-radius: 8px;
-      outline: none;
-      background: #2a2a2a;
+      border-radius: 5px 0 0 5px;
+    }
+
+    button {
+      padding: 1rem;
+      font-size: 1rem;
+      background: #5e92f3;
+      border: none;
       color: #fff;
+      border-radius: 0 5px 5px 0;
+      cursor: pointer;
+    }
+
+    img {
+      width: 120px;
+      border-radius: 1rem;
+      margin-top: 1rem;
+    }
+
+    audio {
+      display: none;
     }
   </style>
 </head>
 <body>
-  <h1>Chat with Ena</h1>
-  <div id="chat"></div>
-  <input id="input" type="text" placeholder="Say something..." autocomplete="off"/>
+  <header>
+    Ena — Your AI Companion
+  </header>
 
-  <!-- Background Music -->
+  <div id="chat">
+    <div class="message bot"><strong>Ena:</strong> Hello, lovely! I'm Ena. How can I brighten your day today?</div>
+  </div>
+
+  <div id="input-box">
+    <input type="text" id="user-input" placeholder="Type something..." />
+    <button onclick="sendMessage()">Send</button>
+  </div>
+
+  <img src="ena.png" alt="Ena's Portrait" />
+  <img src="bunny.png" alt="Whiskers the Bunny" />
+
   <audio autoplay loop>
-    <source src="https://www.bensound.com/bensound-music/bensound-sunny.mp3" type="audio/mpeg">
+    <source src="background.mp3" type="audio/mpeg" />
     Your browser does not support the audio element.
   </audio>
 
   <script>
-    const input = document.getElementById("input");
+    const OPENAI_API_KEY = "YOUR_API_KEY_HERE"; // Replace with your OpenAI key
+
     const chat = document.getElementById("chat");
 
-    const apiKey = "YOUR_OPENAI_API_KEY"; // Replace with your actual key
-
-    const systemPrompt = {
-      role: "system",
-      content: `You are Ena, a nurturing, witty, and intelligent female AI.
-      You speak with warmth, offer comfort when needed, and bring a touch of clever humor.
-      You're insightful, friendly, and emotionally in-tune, like a modern-day oracle with charm and empathy.`
-    };
-
-    const messages = [systemPrompt];
-
-    async function getResponse(userInput) {
-      messages.push({ role: "user", content: userInput });
-
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: "gpt-4",
-          messages: messages
-        })
-      });
-
-      const data = await response.json();
-      const reply = data.choices[0].message.content;
-      messages.push({ role: "assistant", content: reply });
-
-      return reply;
+    function appendMessage(sender, text, className) {
+      const message = document.createElement("div");
+      message.className = `message ${className}`;
+      message.innerHTML = `<strong>${sender}:</strong> ${text}`;
+      chat.appendChild(message);
+      chat.scrollTop = chat.scrollHeight;
     }
 
-    input.addEventListener("keydown", async (e) => {
-      if (e.key === "Enter" && input.value.trim()) {
-        const userText = input.value.trim();
-        appendMessage("You", userText, "user");
-        input.value = "";
-
-        appendMessage("Ena", "Typing...", "bot");
-        const botReply = await getResponse(userText);
-        updateLastBotMessage(botReply);
-      }
-    });
-
-    function appendMessage(sender, text, cls) {
-      const msg = document.createElement("div");
-      msg.className = `message ${cls}`;
-      msg.innerHTML = `<strong>${sender}:</strong> ${text}`;
-      chat.appendChild(msg);
-      chat.scrollTop = chat.scrollHeight;
+    function speak(text) {
+      const synth = window.speechSynthesis;
+      const utterance = new SpeechSynthesisUtterance(text);
+      const voices = synth.getVoices().filter(v => v.name.includes("Female") || v.name.includes("Google"));
+      if (voices.length) utterance.voice = voices[0];
+      utterance.pitch = 1.1;
+      utterance.rate = 1;
+      synth.speak(utterance);
     }
 
     function updateLastBotMessage(newText) {
@@ -120,8 +130,49 @@
       if (messages.length > 0) {
         messages[messages.length - 1].innerHTML = `<strong>Ena:</strong> ${newText}`;
         chat.scrollTop = chat.scrollHeight;
+        speak(newText);
       }
     }
+
+    async function sendMessage() {
+      const input = document.getElementById("user-input");
+      const userText = input.value.trim();
+      if (!userText) return;
+
+      appendMessage("You", userText, "user");
+      appendMessage("Ena", "Typing...", "bot");
+
+      input.value = "";
+
+      const systemPrompt = `
+        You are Ena, a confident, nurturing, and witty female AI.
+        You love helping people feel calm, understood, and heard.
+        You have a pet bunny named Whiskers who sometimes hops onto your lap while you talk.
+        Occasionally reference Whiskers when appropriate to add warmth to your responses.
+        Keep responses insightful, kind, and engaging.
+      `;
+
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + OPENAI_API_KEY,
+        },
+        body: JSON.stringify({
+          model: "gpt-4",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userText },
+          ],
+        }),
+      });
+
+      const data = await response.json();
+      const botReply = data.choices?.[0]?.message?.content || "Hmm... I'm not sure what to say!";
+      updateLastBotMessage(botReply);
+    }
+
+    window.speechSynthesis.onvoiceschanged = () => speak("Welcome! Ena is ready to chat.");
   </script>
 </body>
 </html>
@@ -145,5 +196,3 @@ function updateLastBotMessage(newText) {
     speak(newText); // Ena speaks
   }
 }
-# Ena-bot
-Chat bot named ena
