@@ -196,3 +196,155 @@ function updateLastBotMessage(newText) {
     speak(newText); // Ena speaks
   }
 }
+
+
+
+
+
+
+
+
+
+mobile friendly 
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ena Chatbot</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.10.2/lottie.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background: #f0f0f0;
+    }
+    #chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+    .chat-bubble {
+      max-width: 75%;
+      margin: 0.5rem 0;
+      padding: 0.8rem;
+      border-radius: 1rem;
+    }
+    .user {
+      background: #d1e7dd;
+      align-self: flex-end;
+    }
+    .ena {
+      background: #fff;
+      align-self: flex-start;
+    }
+    #input-container {
+      display: flex;
+      padding: 0.5rem;
+      background: #fff;
+    }
+    #message-input {
+      flex: 1;
+      padding: 0.6rem;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 0.5rem;
+    }
+    button {
+      padding: 0.6rem 1rem;
+      margin-left: 0.5rem;
+      font-size: 1rem;
+    }
+    #ena-lottie, #bunny-lottie {
+      width: 150px;
+      height: 150px;
+    }
+    #animations {
+      display: flex;
+      justify-content: space-evenly;
+      align-items: center;
+      padding: 0.5rem;
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div id="animations">
+    <div id="ena-lottie"></div>
+    <div id="bunny-lottie"></div>
+  </div>
+  <div id="chat-container"></div>
+  <div id="input-container">
+    <input type="text" id="message-input" placeholder="Say something..." />
+    <button onclick="sendMessage()">Send</button>
+  </div>  <script>
+    function appendMessage(text, className) {
+      const chat = document.getElementById('chat-container');
+      const bubble = document.createElement('div');
+      bubble.className = `chat-bubble ${className}`;
+      bubble.innerText = text;
+      chat.appendChild(bubble);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('message-input');
+      const text = input.value.trim();
+      if (!text) return;
+      appendMessage(text, 'user');
+      input.value = '';
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: text }] })
+      });
+
+      const data = await response.json();
+      const reply = data.choices[0].message.content;
+      appendMessage(reply, 'ena');
+      setEmotion(reply);
+    }
+
+    function playLottie(character, url) {
+      const container = document.getElementById(`${character}-lottie`);
+      container.innerHTML = '';
+      lottie.loadAnimation({
+        container,
+        renderer: 'svg',
+        loop: true,
+        autoplay: true,
+        path: url
+      });
+    }
+
+    function setEmotion(emotionText) {
+      const normalized = emotionText.toLowerCase();
+
+      if (normalized.includes("happy") || normalized.includes("joy") || normalized.includes("excited")) {
+        playLottie("ena", "https://assets9.lottiefiles.com/packages/lf20_x62chJ.json");
+        playLottie("bunny", "https://assets4.lottiefiles.com/packages/lf20_yq4xhz8r.json");
+      } else if (normalized.includes("sad") || normalized.includes("melancholy")) {
+        playLottie("ena", "https://assets2.lottiefiles.com/packages/lf20_w1chbjkc.json");
+        playLottie("bunny", "https://assets6.lottiefiles.com/packages/lf20_p6vkwzuc.json");
+      } else if (normalized.includes("angry") || normalized.includes("frustrated")) {
+        playLottie("ena", "https://assets5.lottiefiles.com/packages/lf20_g6gpdijg.json");
+        playLottie("bunny", "https://assets1.lottiefiles.com/packages/lf20_angry_bunny.json");
+      } else if (normalized.includes("curious") || normalized.includes("thinking")) {
+        playLottie("ena", "https://assets3.lottiefiles.com/packages/lf20_thinking.json");
+        playLottie("bunny", "https://assets2.lottiefiles.com/packages/lf20_curious_bunny.json");
+      } else {
+        playLottie("ena", "https://assets9.lottiefiles.com/packages/lf20_x62chJ.json");
+        playLottie("bunny", "https://assets4.lottiefiles.com/packages/lf20_yq4xhz8r.json");
+      }
+    }
+
+    // Load default animations
+    window.addEventListener('load', () => {
+      playLottie("ena", "https://assets9.lottiefiles.com/packages/lf20_x62chJ.json");
+      playLottie("bunny", "https://assets4.lottiefiles.com/packages/lf20_yq4xhz8r.json");
+    });
+  </script></body>
+</html>
