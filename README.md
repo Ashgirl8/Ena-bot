@@ -463,3 +463,436 @@ button { margin: 0.5em; padding: 0.8em 1.2em; font-size: 1em; }
 
 #camera-box video { width: 100%; max-width: 400px; border-radius: 10px; margin-top: 1em; }
 
+updated mobile (no bunny,pixi controls)
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ena — Live2D 4D (Mic + Camera)</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    /* small additions for camera & mic controls */
+    #controls-top { position: absolute; top: 12px; right: 12px; z-index: 999; display:flex; gap:8px; }
+    .ctrl-btn { background:#b77a2b;color:#111;border:none;padding:8px 10px;border-radius:8px;font-weight:700; }
+    #camera-video { display:none; width:160px; height:120px; position: absolute; top: 60px; right: 12px; border-radius:8px; z-index:998; box-shadow:0 6px 20px rgba(0,0,0,0.6); }
+    #emotion-badge { position:absolute; top:12px; left:12px; background:rgba(0,0,0,0.5); color:#fff; padding:6px 10px; border-radius:8px; z-index:999; font-weight:700; }
+  </style>
+  <!-- face-api (used for expression detection) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+</head>
+<body>
+  <div id="stage-root">
+    <div id="live2d-wrap"></div>
+  </div>
+
+  <div id="controls-top">
+    <button id="micBtn" class="ctrl-btn">🎤 Mic</button>
+    <button id="camBtn" class="ctrl-btn">📷 Camera</button>
+    <button id="musicBtn" class="ctrl-btn">🔊 Music</button>
+  </div>
+
+  <div id="emotion-badge">Emotion: neutral</div>
+
+  <!-- tiny camera preview (hidden by default) -->
+  <video id="camera-video" autoplay muted playsinline></video>
+
+  <!-- background music -->
+  <audio id="bgMusic" src="/assets/bg-music.mp3" loop preload="auto"></audio>
+
+  <!-- PIXI + pixi-live2d-display -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/6.5.8/browser/pixi.min.js"></script>
+  <script src="https://unpkg.com/pixi-live2d-display@^4.0.0/dist/pixi-live2d-display.min.js"></script>
+
+  <!-- core live2d + 4D behaviour -->
+  <script src="/live2d-4
+/* live2d-4d.js
+   Pixi + pixi-live2d-display runtime with:
+   - Mic audio analyser -> ParamMouthOpenY (lip sync)
+   - Camera -> face-api expression -> emotion triggers
+   - Idle loop: blink, breath, arm sway
+   - Expression/motion API using model.internalModel.parameter setters
+*/
+
+(async function () {
+  // -----------------------
+  // Config - adjust IDs to match your model
+  // -----------------------
+  const MODEL_JSON = '/models/ena/ena.model3.json'; // path to your exported model
+  const PARAMS = {
+    eyeL: 'ParamEyeLOpen',
+    eyeR: 'ParamEyeROpen',
+    mouth: 'ParamMouthOpenY',
+    breath: 'ParamBreath',
+    arm: 'ParamArmSway',
+    angleX: 'ParamAngle
+/* live2d-4d.js
+   Pixi + pixi-live2d-display runtime with:
+   - Mic audio analyser -> ParamMouthOpenY (lip sync)
+   - Camera -> face-api expression -> emotion triggers
+   - Idle loop: blink, breath, arm sway
+   - Expression/motion API using model.internalModel.parameter setters
+*/
+
+(async function () {
+  // -----------------------
+  // Config - adjust IDs to match your model
+  // -----------------------
+  const MODEL_JSON = '/models/ena/ena.model3.json'; // path to your exported model
+  const PARAMS = {
+    eyeL: 'ParamEyeLOpen',
+    eyeR: 'ParamEyeROpen',
+    mouth: 'ParamMouthOpenY',
+    breath: 'ParamBreath',
+    arm: 'ParamArmSway',
+    angleX: 'ParamAngleX',
+    angleY: 'ParamAngleY'
+  };
+
+  // -----------------------
+  // PIXI App + Live2D model load
+  // -----------------------
+  const app = new PIXI.Application({
+    view: document.createElement('canvas'), // create temporary; we'll append to wrap
+    autoStart: true,
+    backgroundAlpha: 0,
+    resizeTo: window
+  });
+
+  const wrap = document.getElementById('live2d-wrap');
+  wrap.style.width = '100%';
+  wrap.style.height = '100vh';
+  wrap.style.position = 'relative';
+  // append pixi view
+  wrap.appendChild(app.view);
+
+  // ensure proper retina scaling
+  app.renderer.resolution = window.devicePixelRatio || 1;
+
+  // load model
+  let model = null;
+  try {
+    model = await PIXI.live2d.Live2DModel.from(MODEL_JSON);
+    model.anchor.set(0.5, 1.0);
+    app.stage.addChild(model);
+    centerModel();
+  } catch (e) {
+    console.error('Failed to load Live2D model. Check MODEL_JSON path and exported files.', e);
+  }
+
+  function centerModel() {
+    if (!model) return;
+    const w = app.renderer.width;
+    const h = app.renderer.height;
+    model.x = w / 2;
+    model.y = h * 0.95;
+    // scale to fit
+    const desiredWidth = Math.min(w * 0.9, 520);
+    const scale = desiredWidth / (model.width || 480);
+    model.scale.set(scale);
+  }
+  window.addEventListener('resize', centerModel);
+
+  // Helper: safe set parameter by id (works for most pixi-live2d-display runtime)
+  function setParamById(id, value) {
+    try {
+      if (!model || !model.internalModel) return false;
+      const params = model.internalModel.parameters;
+      if (Array.isArray(params)) {
+        const p = params.find((x) => x.id === id);
+        if (p) {
+          p.value = value;
+          return true;
+        }
+      }
+      // fallback: runtime may expose setValueById
+      if (model.internalModel.parameters.setValueById) {
+        model.internalModel.parameters.setValueById(id, value);
+        return true;
+      }
+    } catch (err) {
+      console.warn('setParamById error', err);
+    }
+    return false;
+  }
+
+  // -----------------------
+  // Idle behaviours: blink, breathe, arm sway
+  // -----------------------
+  (function startIdle() {
+    if (!model) return;
+
+    // Blink
+    let lastBlink = Date.now();
+    function blinkTick() {
+      const now = Date.now();
+      if (now - lastBlink > 3000 + Math.random() * 5000) {
+        lastBlink = now;
+        setParamById(PARAMS.eyeL, 0.0);
+        setParamById(PARAMS.eyeR, 0.0);
+        setTimeout(() => {
+          setParamById(PARAMS.eyeL, 1.0);
+          setParamById(PARAMS.eyeR, 1.0);
+        }, 90 + Math.random() * 180);
+      }
+      requestAnimationFrame(blinkTick);
+    }
+    blinkTick();
+
+    // Breathing
+    let t = 0;
+    function breathTick() {
+      t += 0.02;
+      const v = 0.02 + Math.sin(t) * 0.02;
+      setParamById(PARAMS.breath, v);
+      setTimeout(breathTick, 100);
+    }
+    breathTick();
+
+    // Arm sway
+    let at = 0;
+    function armTick() {
+      at += 0.012;
+      const v = Math.sin(at) * 0.06;
+      setParamById(PARAMS.arm, v);
+      setTimeout(armTick, 60);
+    }
+    armTick();
+  })();
+
+  // -----------------------
+  // Microphone analyser -> lip sync
+  // -----------------------
+  let micAnalyser = null;
+  async function startMicAnalyser() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const src = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      src.connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      micAnalyser = { analyser, data };
+
+      function tick() {
+        analyser.getByteFrequencyData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) sum += data[i];
+        const avg = sum / data.length;
+        // tune mapping: avg roughly 0..255 -> normalized mouth 0..1
+        const normalized = Math.min(1, Math.max(0, (avg - 5) / 60));
+        setParamById(PARAMS.mouth, normalized);
+        requestAnimationFrame(tick);
+      }
+      tick();
+      return true;
+    } catch (err) {
+      console.warn('Mic analyser init failed', err);
+      return false;
+    }
+  }
+
+  // Start mic when user presses Mic button
+  const micBtn = document.getElementById('micBtn');
+  micBtn.addEventListener('click', async () => {
+    micBtn.disabled = true;
+    const ok = await startMicAnalyser();
+    if (!ok) alert('Microphone permission denied or not supported.');
+    micBtn.disabled = false;
+  });
+
+  // -----------------------
+  // Camera -> face-api expression detection -> emotion mapping
+  // -----------------------
+  const camBtn = document.getElementById('camBtn');
+  const cameraVideo = document.getElementById('camera-video');
+  const emotionBadge = document.getElementById('emotion-badge');
+
+  let camStream = null;
+  let cameraRunning = false;
+
+  // load face-api models from /models/face-api/
+  async function loadFaceApiModels() {
+    try {
+      await faceapi.nets.tinyFaceDetector.loadFromUri('/models/face-api/');
+      await faceapi.nets.faceExpressionNet.loadFromUri('/models/face-api/');
+      console.log('face-api models loaded');
+    } catch (err) {
+      console.warn('face-api load failed', err);
+    }
+  }
+  loadFaceApiModels();
+
+  async function startCamera() {
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      cameraVideo.srcObject = camStream;
+      cameraVideo.style.display = 'block';
+      cameraRunning = true;
+      detectExpressionsLoop();
+    } catch (err) {
+      cameraVideo.style.display = 'none';
+      cameraRunning = false;
+      console.warn('Camera permission failed', err);
+    }
+  }
+
+  function stopCamera() {
+    if (camStream) {
+      camStream.getTracks().forEach((t) => t.stop());
+    }
+    cameraVideo.style.display = 'none';
+    cameraRunning = false;
+  }
+
+  camBtn.addEventListener('click', async () => {
+    camBtn.disabled = true;
+    if (!cameraRunning) {
+      await startCamera();
+    } else {
+      stopCamera();
+    }
+    camBtn.disabled = false;
+  });
+
+  async function detectExpressionsLoop() {
+    if (!cameraRunning) return;
+    if (cameraVideo.readyState < 2) {
+      setTimeout(detectExpressionsLoop, 500);
+      return;
+    }
+    try {
+      const result = await faceapi
+        .detectSingleFace(cameraVideo, new faceapi.TinyFaceDetectorOptions())
+        .withFaceExpressions();
+      if (result && result.expressions) {
+        const expressions = result.expressions;
+        // pick highest prob
+        const sorted = Object.entries(expressions).sort((a, b) => b[1] - a[1]);
+        const dominant = sorted[0][0]; // e.g., happy, sad, angry, surprised, neutral
+        const prob = sorted[0][1];
+        // Map to Ena emotions using thresholds
+        let mapped = 'neutral';
+        if (dominant === 'happy' && prob > 0.5) mapped = 'happy';
+        else if (dominant === 'sad' && prob > 0.5) mapped = 'sad';
+        else if (dominant === 'angry' && prob > 0.45) mapped = 'angry';
+        else if (dominant === 'surprised' && prob > 0.45) mapped = 'surprised';
+        else if (dominant === 'neutral' && prob > 0.6) mapped = 'neutral';
+
+        // trigger animation + badge
+        handleEmotion(mapped);
+      }
+    } catch (err) {
+      // console.warn('detectExpressions error', err);
+    }
+    setTimeout(detectExpressionsLoop, 450);
+  }
+
+  // -----------------------
+  // Emotion handling -> motions + lottie overlay (if present) + badge
+  // -----------------------
+  function handleEmotion(emotion) {
+    emotionBadge.textContent = 'Emotion: ' + emotion;
+    // Play expression (if exported) or play motion
+    try {
+      // first try expression mapping
+      if (model && model.setExpression) {
+        model.setExpression && model.setExpression(emotion);
+      }
+      // then try motion groups (if available)
+      if (model && model.internalModel && model.internalModel.motionManager) {
+        // try to start a motion with group name same as emotion
+        try {
+          model.internalModel.motionManager.startRandomMotion(emotion, 0);
+        } catch (e) {
+          // fallback: model.motion if exposed by runtime
+          try { model.motion && model.motion(emotion, 0, 1); } catch(e){}
+        }
+      }
+    } catch (err) {
+      console.warn('handleEmotion error', err);
+    }
+    // optional: play small lottie accent
+    try { window.playLottieEmotion && window.playLottieEmotion(emotion); } catch(e){}
+  }
+
+  // -----------------------
+  // Voice tone -> head angle subtle mapping (optional)
+  // Use mic analyser amplitude to slightly move head angle parameters for expressiveness
+  // -----------------------
+  function startHeadAngleMapping() {
+    if (!micAnalyser) return;
+    const { analyser, data } = micAnalyser;
+    (function tick() {
+      try {
+        analyser.getByteFrequencyData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) sum += data[i];
+        const avg = sum / data.length;
+        // map avg (0..~200) to angleX (-15..15 deg) normalized -1..1
+        const normalized = (avg - 10) / 60; // tuned factor
+        const angleX = Math.max(-1, Math.min(1, normalized));
+        setParamById(PARAMS.angleX, angleX * 15); // if model expects degrees or normalized, tune accordingly
+      } catch (err) {}
+      requestAnimationFrame(tick);
+    })();
+  }
+
+  // start head mapping once mic analyser available
+  // we monitor micAnalyser variable and start mapping once non-null
+  (function waitForMic() {
+    if (micAnalyser) startHeadAngleMapping();
+    else setTimeout(waitForMic, 500);
+  })();
+
+  // -----------------------
+  // Background music toggle
+  // -----------------------
+  const musicBtn = document.getElementById('musicBtn');
+  const bgMusic = document.getElementById('bgMusic');
+  musicBtn.addEventListener('click', async () => {
+    try {
+      if (bgMusic.paused) {
+        // ensure audio context
+        try { const ctx = new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state === 'suspended') await ctx.resume(); } catch(e){}
+        await bgMusic.play().catch(()=>{});
+        musicBtn.textContent = '🔇 Music';
+      } else {
+        bgMusic.pause();
+        musicBtn.textContent = '🔊 Music';
+      }
+    } catch (err) { console.warn('Music error', err); }
+  });
+
+  // -----------------------
+  // Keyboard testing triggers (optional)
+  // -----------------------
+  document.addEventListener('keydown', (e) => {
+    if (!model) return;
+    switch (e.key) {
+      case '1': handleEmotion('happy'); break;
+      case '2': handleEmotion('sad'); break;
+      case '3': handleEmotion('angry'); break;
+      case '4': handleEmotion('surprised'); break;
+      case '0': handleEmotion('neutral'); break;
+    }
+  });
+
+  // Expose API for debugging
+  window._EnaLive2D = {
+    model,
+    setParam: setParamById,
+    handleEmotion,
+    startMicAnalyser: async () => {
+      const ok = await startMicAnalyser();
+      if (ok) startHeadAngleMapping();
+      return ok;
+    },
+    startCamera,
+    stopCamera
+  };
+
+  console.log('Live2D 4D runtime initialized');
+
+})();
